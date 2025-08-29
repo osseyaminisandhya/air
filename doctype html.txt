@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AirAware • AI & IoT Air Quality App (Prototype)</title>
+  <style>
+    :root{
+      --bg:#0b1320; --card:#111a2b; --muted:#93a4c0; --text:#eef4ff;
+      --accent:#4cc9f0; --good:#22c55e; --moderate:#eab308; --unhealthy:#ef4444; --very:#a21caf; --hazard:#7f1d1d;
+      --border:rgba(255,255,255,.1);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 600px at 80% -10%, #163058 0%, transparent 70%),
+                 radial-gradient(900px 500px at -10% 60%, #1b2b48 0%, transparent 60%), var(--bg); 
+         color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
+    header{position:sticky;top:0;backdrop-filter:saturate(1.2) blur(8px);background:rgba(11,19,32,.7);
+      border-bottom:1px solid var(--border); z-index:10}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.3px}
+    .logo{width:36px;height:36px;border-radius:50%; background:conic-gradient(from 210deg, var(--accent), #38bdf8 20%, #22c55e 60%, transparent 60%),
+          radial-gradient(circle at 55% 45%, #fff8, #fff0 55%), linear-gradient(135deg,#0ea5e9,#22c55e);
+          box-shadow:0 0 0 2px #0ea5e955,0 6px 18px #0ea5e980}
+    .grid{display:grid;gap:16px}
+    @media(min-width:900px){ .grid.cols-3{grid-template-columns:2fr 1.3fr 1.3fr} }
+    .card{background:linear-gradient(180deg, #0f172a, #0b1320); border:1px solid var(--border); border-radius:18px; padding:18px; box-shadow:0 8px 24px #0005}
+    .card h2{margin:0 0 8px;font-size:18px}
+    .muted{color:var(--muted)}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    button,.btn{appearance:none; border:1px solid var(--border); background:#0f172a; color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    button:hover{border-color:#2b3d5f}
+    select,input[type="number"],input[type="text"],input[type="file"],textarea{width:100%; background:#0a1322; color:var(--text); border:1px solid var(--border); border-radius:12px; padding:10px}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px}
+    .legend{display:flex;gap:8px;flex-wrap:wrap}
+    .legend .dot{width:10px;height:10px;border-radius:50%}
+    .aqi-box{display:grid;grid-template-columns:repeat(10,1fr); gap:6px}
+    .cell{aspect-ratio:1/1;border-radius:10px;border:1px solid var(--border); display:flex;align-items:center;justify-content:center;font-size:11px}
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr); gap:10px}
+    .kpi .item{background:#09101d;border:1px solid var(--border); padding:14px; border-radius:14px; text-align:center}
+    .progress{height:10px;border-radius:999px;background:#0b192e;border:1px solid var(--border);overflow:hidden}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent));width:0%}
+    .divider{height:1px;background:var(--border);margin:12px 0}
+    .tiny{font-size:12px}
+    footer{opacity:.7}
+    .tag{padding:6px 8px;border-radius:10px;border:1px dashed var(--border);font-size:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row" role="navigation" aria-label="Top bar">
+      <div class="brand"><span class="logo" aria-hidden="true"></span> <span>AirAware • Prototype</span></div>
+      <span class="pill">AI & IoT for Cleaner Air</span>
+    </div>
+  </header>
+
+  <main class="wrap grid cols-3" aria-live="polite">
+    <!-- Left: AQI Map / Simulation -->
+    <section class="card" aria-labelledby="aqiTitle">
+      <h2 id="aqiTitle">Live AQI Map (Simulated)</h2>
+      <p class="muted tiny">Click <b>Simulate Data</b> to generate city-wide AQI from IoT sensors. Colors follow Indian AQI ranges.</p>
+
+      <div class="legend tiny" aria-label="AQI legend">
+        <span class="row"><i class="dot" style="background:var(--good)"></i> Good (0–50)</span>
+        <span class="row"><i class="dot" style="background:var(--moderate)"></i> Moderate (51–100)</span>
+        <span class="row"><i class="dot" style="background:#f97316"></i> Unhealthy-Sensitive (101–200)</span>
+        <span class="row"><i class="dot" style="background:var(--unhealthy)"></i> Unhealthy (201–300)</span>
+        <span class="row"><i class="dot" style="background:var(--very)"></i> Very Unhealthy (301–400)</span>
+        <span class="row"><i class="dot" style="background:var(--hazard)"></i> Hazardous (401+)</span>
+      </div>
+
+      <div id="aqiGrid" class="aqi-box" role="grid" aria-label="City AQI grid"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="simulateBtn">Simulate Data</button>
+        <span id="avgAQI" class="pill">Average AQI: –</span>
+        <span id="bestZone" class="pill">Cleanest Zone: –</span>
+      </div>
+
+      <div class="divider"></div>
+      <div class="kpi">
+        <div class="item"><div class="tiny muted">PM2.5 (µg/m³)</div><div id="kPM25" style="font-size:22px;font-weight:700">–</div></div>
+        <div class="item"><div class="tiny muted">NO₂ (ppb)</div><div id="kNO2" style="font-size:22px;font-weight:700">–</div></div>
+        <div class="item"><div class="tiny muted">O₃ (ppb)</div><div id="kO3" style="font-size:22px;font-weight:700">–</div></div>
+      </div>
+    </section>
+
+    <!-- Middle: Health / Alerts / Route -->
+    <section class="card" aria-labelledby="healthTitle">
+      <h2 id="healthTitle">Health Guard & Alerts</h2>
+      <label class="tiny muted" for="aqiInput">Set your local AQI</label>
+      <input id="aqiInput" type="range" min="0" max="500" value="80" />
+      <div id="advice" class="tag" style="margin-top:8px">—</div>
+
+      <div class="divider"></div>
+      <h2>Smart Route Planner</h2>
+      <div class="row">
+        <select id="fromSel" aria-label="From">
+          <option value="A">Origin: Sector A</option>
+          <option value="B">Origin: Sector B</option>
+          <option value="C">Origin: Sector C</option>
+        </select>
+        <select id="toSel" aria-label="To">
+          <option value="C">Destination: Sector C</option>
+          <option value="D">Destination: Sector D</option>
+          <option value="E">Destination: Sector E</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="planBtn">Find Least‑Polluted Route</button>
+        <span id="routeAQI" class="pill">Route AQI: –</span>
+      </div>
+      <ol id="steps" class="tiny" style="margin-top:8px"></ol>
+    </section>
+
+    <!-- Right: Report & Rewards -->
+    <section class="card" aria-labelledby="reportTitle">
+      <h2 id="reportTitle">Community Report</h2>
+      <p class="tiny muted">See burning garbage or visible emissions? Report quickly.</p>
+      <input id="reportTxt" type="text" placeholder="Describe the issue (e.g., garbage burning near park)" />
+      <input id="reportImg" type="file" accept="image/*" />
+      <div class="row" style="margin-top:8px">
+        <button id="reportBtn">Submit Report</button>
+        <span id="reportStatus" class="pill">No reports yet</span>
+      </div>
+
+      <div class="divider"></div>
+      <h2>Green Rewards</h2>
+      <div class="row tiny">
+        <label><input type="checkbox" class="act" value="10" /> Used public transport</label>
+        <label><input type="checkbox" class="act" value="15" /> Avoided single‑use plastic</label>
+        <label><input type="checkbox" class="act" value="20" /> Planted a tree</label>
+      </div>
+      <div class="progress" aria-label="Rewards progress"><i id="bar"></i></div>
+      <div class="row" style="justify-content:space-between"><span class="tiny muted">Points: <b id="points">0</b> / 100</span><button id="redeemBtn" class="btn">Redeem</button></div>
+    </section>
+  </main>
+
+  <footer class="wrap tiny" style="margin-top:20px">
+    Built as a static prototype. Replace the mock data with real IoT feeds and plug in your backend for reports & rewards.
+  </footer>
+
+<script>
+  // --- Helpers
+  const $ = (q)=>document.querySelector(q);
+  const $$ = (q)=>Array.from(document.querySelectorAll(q));
+  const ranges = [
+    {name:'Good', c:'var(--good)', max:50, msg:'Air is good. Enjoy outdoor activities.'},
+    {name:'Moderate', c:'var(--moderate)', max:100, msg:'Moderate. Sensitive groups should take care.'},
+    {name:'Unhealthy (SG)', c:'#f97316', max:200, msg:'Sensitive groups: wear masks outdoors.'},
+    {name:'Unhealthy', c:'var(--unhealthy)', max:300, msg:'Limit outdoor exercise; consider mask.'},
+    {name:'Very Unhealthy', c:'var(--very)', max:400, msg:'Avoid outdoor activity; use air purifier.'},
+    {name:'Hazardous', c:'var(--hazard)', max:999, msg:'Stay indoors. N95+ mask if outside.'}
+  ];
+  const bucket = (aqi)=>ranges.find(r=>aqi<=r.max);
+
+  // --- AQI Grid Simulation
+  const grid = $('#aqiGrid');
+  const CELLS = 50; // 10x5 visually
+  function drawGrid(values){
+    grid.innerHTML = '';
+    values.forEach((v,i)=>{
+      const b = bucket(v);
+      const d = document.createElement('div');
+      d.className='cell'; d.style.background=b.c; d.title = Zone ${i+1} • AQI ${v};
+      d.textContent = v; grid.appendChild(d);
+    });
+  }
+  function simulate(){
+    const vals = Array.from({length:100}, ()=>Math.floor(Math.random()*470));
+    drawGrid(vals);
+    const avg = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+    const clean = vals.reduce((acc,v,i)=> v<acc.v ? {i,v}:acc, {i:0,v:999});
+    $('#avgAQI').textContent = Average AQI: ${avg};
+    $('#bestZone').textContent = Cleanest Zone: #${clean.i+1} (${clean.v});
+    // mock KPIs relative to AQI
+    $('#kPM25').textContent = Math.round(avg*0.6);
+    $('#kNO2').textContent  = Math.round(avg*0.2);
+    $('#kO3').textContent   = Math.round(avg*0.15);
+    return vals;
+  }
+  $('#simulateBtn').addEventListener('click', simulate);
+  drawGrid(Array.from({length:100}, ()=>80)); // initial
+
+  // --- Health advice
+  function updateAdvice(){
+    const v = +$('#aqiInput').value; const b = bucket(v);
+    $('#advice').style.borderColor = 'var(--border)';
+    $('#advice').style.background = b.c;
+    $('#advice').textContent = AQI ${v} • ${b.name} — ${b.msg};
+  }
+  $('#aqiInput').addEventListener('input', updateAdvice); updateAdvice();
+
+  // --- Route planner (mock graph with segment AQI)
+  const routes = {
+    'A-C': {aqi: 140, steps:['A → Metro Line 1','Walk 400m via Greenway','C (City Center)']},
+    'A-D': {aqi: 210, steps:['A → Ring Road','Bus 22 (10 min)','D (Industrial Area)']},
+    'B-C': {aqi: 180, steps:['B → Lakeside','Cycle route','C (City Center)']},
+    'B-E': {aqi: 120, steps:['B → Park Lane','Metro Line 2','E (Eco District)']},
+    'C-D': {aqi: 190, steps:['C → Old Town','Tram','D']},
+    'C-E': {aqi: 95,  steps:['C → River Walk','E-bike lane','E']},
+  };
+  function plan(){
+    const k = ${$('#fromSel').value}-${$('#toSel').value};
+    let best = routes[k];
+    if(!best){ // try reversed mapping
+      const rk = ${$('#toSel').value}-${$('#fromSel').value};
+      best = routes[rk];
+    }
+    if(!best){ $('#routeAQI').textContent = 'Route AQI: n/a'; $('#steps').innerHTML=''; return; }
+    $('#routeAQI').textContent = Route AQI: ${best.aqi};
+    $('#steps').innerHTML = best.steps.map(s=><li>${s}</li>).join('');
+  }
+  $('#planBtn').addEventListener('click', plan);
+
+  // --- Reports & Rewards
+  let points = 0;
+  function calcPoints(){
+    points = $$('.act').reduce((t,c)=> t + (c.checked? +c.value : 0), 0);
+    $('#points').textContent = points;
+    $('#bar').style.width = Math.min(points,100) + '%';
+  }
+  $$('.act').forEach(c=> c.addEventListener('change', calcPoints));
+  $('#redeemBtn').addEventListener('click', ()=> alert(points>=50 ? '🎉 Reward unlocked! (demo)' : 'Earn 50+ points to redeem.'));
+  $('#reportBtn').addEventListener('click', ()=>{
+    const msg = $('#reportTxt').value.trim();
+    $('#reportStatus').textContent = msg? 'Report submitted ✔ (demo)' : 'Please describe the issue.';
+  });
+</script>
+</body>
+</html>
